@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import type { Webhook } from '../types/index';
+import { useState, memo } from 'react';
+import type { Webhook } from '../types';
 import api from '../api/axios';
 
 interface Props {
@@ -21,7 +21,8 @@ const statusDot = {
   failure: 'bg-red-400',
 };
 
-export default function WebhookCard({ webhook, onDeleted, triggeringId, onTrigger }: Props) {
+//  memo — only re-renders if props actually change
+const WebhookCard = memo(function WebhookCard({ webhook, onDeleted, triggeringId, onTrigger }: Props) {
   const [deleting, setDeleting] = useState(false);
   const isTriggering = triggeringId === webhook._id;
 
@@ -44,8 +45,6 @@ export default function WebhookCard({ webhook, onDeleted, triggeringId, onTrigge
           <h3 className="text-white font-semibold truncate">{webhook.name}</h3>
           <p className="text-gray-500 text-xs truncate mt-0.5">{webhook.url}</p>
         </div>
-
-        {/* Status badge */}
         <span className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${statusStyles[webhook.lastStatus]}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${statusDot[webhook.lastStatus]}`} />
           {webhook.lastStatus}
@@ -96,4 +95,6 @@ export default function WebhookCard({ webhook, onDeleted, triggeringId, onTrigge
       </div>
     </div>
   );
-}
+});
+
+export default WebhookCard;
