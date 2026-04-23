@@ -21,8 +21,12 @@ const statusDot = {
   failure: 'bg-red-400',
 };
 
-//  memo — only re-renders if props actually change
-const WebhookCard = memo(function WebhookCard({ webhook, onDeleted, triggeringId, onTrigger }: Props) {
+const WebhookCard = memo(function WebhookCard({
+  webhook,
+  onDeleted,
+  triggeringId,
+  onTrigger,
+}: Props) {
   const [deleting, setDeleting] = useState(false);
   const isTriggering = triggeringId === webhook._id;
 
@@ -39,8 +43,9 @@ const WebhookCard = memo(function WebhookCard({ webhook, onDeleted, triggeringId
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 hover:border-gray-700 transition">
-      {/* Top row */}
-      <div className="flex items-start justify-between gap-4 mb-3">
+
+      {/* Top row — name + status */}
+      <div className="flex items-start justify-between gap-4 mb-2">
         <div className="min-w-0">
           <h3 className="text-white font-semibold truncate">{webhook.name}</h3>
           <p className="text-gray-500 text-xs truncate mt-0.5">{webhook.url}</p>
@@ -48,6 +53,38 @@ const WebhookCard = memo(function WebhookCard({ webhook, onDeleted, triggeringId
         <span className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${statusStyles[webhook.lastStatus]}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${statusDot[webhook.lastStatus]}`} />
           {webhook.lastStatus}
+        </span>
+      </div>
+
+      {/* Events */}
+      <div className="flex flex-wrap gap-1 mb-3">
+        {webhook.events.slice(0, 3).map((event) => (
+          <span
+            key={event}
+            className="px-2 py-0.5 bg-gray-800 text-gray-400 text-xs rounded-md font-mono"
+          >
+            {event}
+          </span>
+        ))}
+        {webhook.events.length > 3 && (
+          <span className="px-2 py-0.5 bg-gray-800 text-gray-500 text-xs rounded-md">
+            +{webhook.events.length - 3} more
+          </span>
+        )}
+        {webhook.events.length === 0 && (
+          <span className="px-2 py-0.5 bg-gray-800 text-gray-600 text-xs rounded-md">
+            No events selected
+          </span>
+        )}
+      </div>
+
+      {/* Payload style + destination type */}
+      <div className="flex gap-2 mb-3">
+        <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs rounded-md capitalize">
+          {webhook.payloadStyle}
+        </span>
+        <span className="px-2 py-0.5 bg-gray-800 text-gray-400 text-xs rounded-md">
+          {webhook.destinationType?.replace(/_/g, ' ')}
         </span>
       </div>
 
