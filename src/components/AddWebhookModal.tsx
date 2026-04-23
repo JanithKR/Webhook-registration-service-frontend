@@ -1,6 +1,11 @@
 import { useState, forwardRef, useImperativeHandle } from 'react';
 import api from '../api/axios';
-import type { EventType, DestinationType, PayloadStyle } from '../types';
+import type { DestinationType, PayloadStyle } from '../types';
+import type { EventNode, EventTree } from '../types/events';
+import { collectLeaves, insertNode } from '../types/events';
+import EventTreeNode from './EventTreeNode';
+import AddRootEvent from './AddRootEvent';
+import eventConfig from '../config/events.json';
 
 interface Props {
   onClose: () => void;
@@ -10,29 +15,6 @@ interface Props {
 export interface AddWebhookModalHandle {
   reset: () => void;
 }
-
-const ALL_EVENTS: { group: string; events: EventType[] }[] = [
-  {
-    group: 'Payment Events',
-    events: ['payment.success', 'payment.failed'],
-  },
-  {
-    group: 'Customer Events',
-    events: ['customer.created', 'customer.deleted'],
-  },
-  {
-    group: 'Order Events',
-    events: ['order.created', 'order.updated', 'order.cancelled'],
-  },
-  {
-    group: 'User Events',
-    events: ['user.created', 'user.deleted'],
-  },
-  {
-    group: 'Balance Events',
-    events: ['balance.available'],
-  },
-];
 
 const DESTINATION_TYPES: {
   type: DestinationType;
@@ -63,7 +45,12 @@ const DESTINATION_TYPES: {
 const AddWebhookModal = forwardRef<AddWebhookModalHandle, Props>(
   ({ onClose, onAdded }, ref) => {
     const [step, setStep] = useState(1);
-    const [selectedEvents, setSelectedEvents] = useState<EventType[]>([]);
+
+    // ✅ Live event tree state — starts from JSON, user extends it
+    const [eventTree, setEventTree] = useState<EventTree>(
+    eventConfig as unknown as EventTree
+    );
+    const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
     const [destinationType, setDestinationType] = useState<DestinationType>('webhook_endpoint');
     const [payloadStyle, setPayloadStyle] = useState<PayloadStyle>('snapshot');
     const [name, setName] = useState('');
@@ -74,6 +61,7 @@ const AddWebhookModal = forwardRef<AddWebhookModalHandle, Props>(
     useImperativeHandle(ref, () => ({
       reset: () => {
         setStep(1);
+        setEventTree(eventConfig as unknown as EventTree);
         setSelectedEvents([]);
         setDestinationType('webhook_endpoint');
         setPayloadStyle('snapshot');
@@ -84,34 +72,44 @@ const AddWebhookModal = forwardRef<AddWebhookModalHandle, Props>(
       },
     }));
 
-    const toggleEvent = (event: EventType) => {
-      setSelectedEvents((prev) =>
-        prev.includes(event) ? prev.filter((e) => e !== event) : [...prev, event]
-      );
+    // ✅ Toggle node — selects/deselects all leaves under it
+    const handleToggle = (key: string, node: EventNode) => {
+      const leaves = collectLeaves(key, node);
+      const allSelected = leaves.every((l) => selectedEvents.includes(l));
+      if (allSelected) {
+        setSelectedEvents((prev) => prev.filter((e) => !leaves.includes(e)));
+      } else {
+        setSelectedEvents((prev) => [...new Set([...prev, ...leaves])]);
+      }
     };
 
-    const toggleGroup = (events: EventType[]) => {
-      const allSelected = events.every((e) => selectedEvents.includes(e));
-      if (allSelected) {
-        setSelectedEvents((prev) => prev.filter((e) => !events.includes(e)));
-      } else {
-        setSelectedEvents((prev) => [...new Set([...prev, ...events])]);
-      }
+    // ✅ Add child event — recursively inserts into live tree
+    const handleAddChild = (
+      parentPath: string[],
+      newKey: string,
+      newLabel: string
+    ) => {
+      setEventTree((prev) => insertNode(prev, parentPath, newKey, newLabel));
+    };
+
+    // ✅ Add root level event group — no limit
+    const handleAddRootEvent = (key: string, label: string) => {
+      setEventTree((prev) => ({
+        ...prev,
+        [key]: { label, children: {} },
+      }));
     };
 
     const handleSubmit = async () => {
       setError('');
-
       if (!name || !url) {
         setError('Name and URL are required');
         return;
       }
-
       if (selectedEvents.length === 0) {
         setError('Please select at least one event');
         return;
       }
-
       setLoading(true);
       try {
         await api.post('/webhooks', {
@@ -166,66 +164,36 @@ const AddWebhookModal = forwardRef<AddWebhookModalHandle, Props>(
 
           <div className="p-6 max-h-[70vh] overflow-y-auto">
 
-            {/* Step 1 — Select Events */}
+            {/* ✅ Step 1 — Recursive dynamic event tree */}
             {step === 1 && (
               <div>
                 <h2 className="text-white font-semibold text-lg mb-1">
                   Select which events to listen to
                 </h2>
                 <p className="text-gray-400 text-sm mb-4">
-                  We'll send these events to your destination.
+                  Hover any event to add a child. No limit on depth or count.
                 </p>
 
-                <div className="space-y-3">
-                  {ALL_EVENTS.map(({ group, events }) => {
-                    const allSelected = events.every((e) => selectedEvents.includes(e));
-                    return (
-                      <div key={group} className="bg-gray-800 rounded-xl overflow-hidden">
-                        {/* Group header */}
-                        <div
-                          className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-750"
-                          onClick={() => toggleGroup(events)}
-                        >
-                          <span className="text-white text-sm font-medium">{group}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-400 text-xs">{events.length} events</span>
-                            <input
-                              type="checkbox"
-                              checked={allSelected}
-                              onChange={() => toggleGroup(events)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-indigo-600"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Individual events */}
-                        <div className="border-t border-gray-700">
-                          {events.map((event) => (
-                            <div
-                              key={event}
-                              className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-750 cursor-pointer"
-                              onClick={() => toggleEvent(event)}
-                            >
-                              <div>
-                                <p className="text-gray-300 text-sm font-mono">{event}</p>
-                              </div>
-                              <input
-                                type="checkbox"
-                                checked={selectedEvents.includes(event)}
-                                onChange={() => toggleEvent(event)}
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-indigo-600"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
+                {/* ✅ Dynamic recursive tree from JSON state */}
+                <div className="space-y-2">
+                  {Object.entries(eventTree).map(([key, node]) => (
+                    <EventTreeNode
+                      key={key}
+                      eventKey={key}
+                      node={node}
+                      selectedEvents={selectedEvents}
+                      onToggle={handleToggle}
+                      onAddChild={handleAddChild}
+                      parentPath={[]}
+                      depth={0}
+                    />
+                  ))}
                 </div>
 
-                <p className="text-gray-500 text-xs mt-3">
+                {/* ✅ Add root event group — no limit */}
+                <AddRootEvent onAdd={handleAddRootEvent} />
+
+                <p className="text-gray-500 text-xs mt-4">
                   {selectedEvents.length} event{selectedEvents.length !== 1 ? 's' : ''} selected
                 </p>
               </div>
@@ -240,7 +208,6 @@ const AddWebhookModal = forwardRef<AddWebhookModalHandle, Props>(
                 <p className="text-gray-400 text-sm mb-4">
                   Select your destination type.
                 </p>
-
                 <div className="space-y-3">
                   {DESTINATION_TYPES.map(({ type, label, description, icon }) => (
                     <div
@@ -258,9 +225,7 @@ const AddWebhookModal = forwardRef<AddWebhookModalHandle, Props>(
                         <p className="text-gray-400 text-xs mt-0.5">{description}</p>
                       </div>
                       <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        destinationType === type
-                          ? 'border-indigo-500'
-                          : 'border-gray-600'
+                        destinationType === type ? 'border-indigo-500' : 'border-gray-600'
                       }`}>
                         {destinationType === type && (
                           <div className="w-2 h-2 rounded-full bg-indigo-500" />
@@ -289,11 +254,7 @@ const AddWebhookModal = forwardRef<AddWebhookModalHandle, Props>(
                 )}
 
                 {/* Summary */}
-                <div className="bg-gray-800 rounded-xl p-4 mb-4 text-xs space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Events from</span>
-                    <span className="text-gray-300">Your account</span>
-                  </div>
+                <div className="bg-gray-800 rounded-xl p-4 mb-4 text-xs space-y-2">
                   <div className="flex justify-between">
                     <span className="text-gray-500">Destination</span>
                     <span className="text-gray-300">
@@ -303,6 +264,21 @@ const AddWebhookModal = forwardRef<AddWebhookModalHandle, Props>(
                   <div className="flex justify-between">
                     <span className="text-gray-500">Selected events</span>
                     <span className="text-gray-300">{selectedEvents.length} events</span>
+                  </div>
+                  <div className="pt-1 flex flex-wrap gap-1">
+                    {selectedEvents.slice(0, 5).map((e) => (
+                      <span
+                        key={e}
+                        className="px-2 py-0.5 bg-gray-700 text-gray-300 rounded font-mono text-xs"
+                      >
+                        {e}
+                      </span>
+                    ))}
+                    {selectedEvents.length > 5 && (
+                      <span className="px-2 py-0.5 bg-gray-700 text-gray-400 rounded text-xs">
+                        +{selectedEvents.length - 5} more
+                      </span>
+                    )}
                   </div>
                 </div>
 

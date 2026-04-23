@@ -73,20 +73,20 @@ const WebhookCard = memo(function WebhookCard({
         )}
         {webhook.events.length === 0 && (
           <span className="px-2 py-0.5 bg-gray-800 text-gray-600 text-xs rounded-md">
-            No events selected
+            {/* No events selected */}
           </span>
         )}
       </div>
 
       {/* Payload style + destination type */}
-      <div className="flex gap-2 mb-3">
+      {/* <div className="flex gap-2 mb-3">
         <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs rounded-md capitalize">
           {webhook.payloadStyle}
         </span>
         <span className="px-2 py-0.5 bg-gray-800 text-gray-400 text-xs rounded-md">
           {webhook.destinationType?.replace(/_/g, ' ')}
         </span>
-      </div>
+      </div> */}
 
       {/* Last triggered */}
       <p className="text-gray-600 text-xs mb-4">
