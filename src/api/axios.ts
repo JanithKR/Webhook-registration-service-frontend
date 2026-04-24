@@ -1,25 +1,37 @@
 import axios from 'axios';
+import { local, session, cookies } from '../utils/storage';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
 });
 
-// Attach token to every request automatically
+//  Try all three storages for token
+const getToken = (): string | null => {
+  return (
+    local.get<string>('token') ||
+    session.get<string>('token') ||
+    cookies.get('token')
+  );
+};
+
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = getToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// Auto logout on 401
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      local.remove('token');
+      local.remove('user');
+      session.remove('token');
+      session.remove('user');
+      cookies.remove('token');
+      cookies.remove('user');
       window.location.href = '/login';
     }
     return Promise.reject(error);

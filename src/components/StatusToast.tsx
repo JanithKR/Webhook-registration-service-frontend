@@ -7,7 +7,7 @@ interface Toast {
 }
 
 interface Props {
-  toasts: Toast[];
+  toasts: readonly Toast[];
   onRemove: (id: string) => void;
 }
 

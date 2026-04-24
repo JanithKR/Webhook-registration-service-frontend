@@ -1,0 +1,80 @@
+{
+  "payment": {
+    "label": "Payment Events",
+    "children": {
+      "success": {
+        "label": "Payment Success",
+        "children": {
+          "card": { "label": "Card Payment" },
+          "bank": { "label": "Bank Transfer" },
+          "wallet": { "label": "Wallet Payment" }
+        }
+      },
+      "failed": {
+        "label": "Payment Failed",
+        "children": {
+          "declined": { "label": "Card Declined" },
+          "expired": { "label": "Card Expired" },
+          "insufficient": { "label": "Insufficient Funds" }
+        }
+      },
+      "refunded": { "label": "Payment Refunded" },
+      "disputed": { "label": "Payment Disputed" }
+    }
+  },
+  "customer": {
+    "label": "Customer Events",
+    "children": {
+      "created": { "label": "Customer Created" },
+      "updated": { "label": "Customer Updated" },
+      "deleted": { "label": "Customer Deleted" },
+      "subscription": {
+        "label": "Subscription Events",
+        "children": {
+          "started": { "label": "Subscription Started" },
+          "cancelled": { "label": "Subscription Cancelled" },
+          "renewed": { "label": "Subscription Renewed" }
+        }
+      }
+    }
+  },
+  "order": {
+    "label": "Order Events",
+    "children": {
+      "created": { "label": "Order Created" },
+      "updated": { "label": "Order Updated" },
+      "cancelled": { "label": "Order Cancelled" },
+      "fulfillment": {
+        "label": "Fulfillment Events",
+        "children": {
+          "shipped": { "label": "Order Shipped" },
+          "delivered": { "label": "Order Delivered" },
+          "returned": { "label": "Order Returned" }
+        }
+      }
+    }
+  },
+  "user": {
+    "label": "User Events",
+    "children": {
+      "created": { "label": "User Created" },
+      "updated": { "label": "User Updated" },
+      "deleted": { "label": "User Deleted" },
+      "auth": {
+        "label": "Auth Events",
+        "children": {
+          "login": { "label": "User Login" },
+          "logout": { "label": "User Logout" },
+          "password_reset": { "label": "Password Reset" }
+        }
+      }
+    }
+  },
+  "balance": {
+    "label": "Balance Events",
+    "children": {
+      "available": { "label": "Balance Available" },
+      "updated": { "label": "Balance Updated" }
+    }
+  }
+}

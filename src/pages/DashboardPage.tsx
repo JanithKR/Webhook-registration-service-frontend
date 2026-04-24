@@ -1,30 +1,32 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebhookState } from '../hooks/useWebhookState';
 import type { Webhook, WebSocketMessage } from '../types';
 import api from '../api/axios';
 import WebhookCard from '../components/WebhookCard';
 import AddWebhookModal from '../components/AddWebhookModal';
+import type { AddWebhookModalHandle } from '../components/AddWebhookModal';
 import StatusToast from '../components/StatusToast';
-
-interface Toast {
-  id: string;
-  status: 'sending' | 'success' | 'failure';
-  message: string;
-}
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
-
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [triggeringId, setTriggeringId] = useState<string | null>(null);
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const [search, setSearch] = useState('');
 
-  // ✅ useRef — focuses search input on mount
+  // ✅ hookstate — replaces multiple useState calls
+  const {
+    search, setSearch,
+    triggeringId, setTriggeringId,
+    showModal, setShowModal,
+    toasts, addOrUpdateToast, removeToast,
+  } = useWebhookState();
+
+  // ✅ useRef for DOM (search input focus)
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // ✅ useRef for imperative handle (modal reset)
+  const modalRef = useRef<AddWebhookModalHandle>(null);
 
   useEffect(() => {
     searchRef.current?.focus();
@@ -45,7 +47,6 @@ export default function DashboardPage() {
     fetchWebhooks();
   }, [fetchWebhooks]);
 
-  // ✅ useMemo — stats only recalculate when webhooks array changes
   const stats = useMemo(() => {
     const total = webhooks.length;
     const success = webhooks.filter((w) => w.lastStatus === 'success').length;
@@ -54,7 +55,6 @@ export default function DashboardPage() {
     return { total, success, failure, pending };
   }, [webhooks]);
 
-  // ✅ useMemo — filtered list only recalculates when search or webhooks change
   const filteredWebhooks = useMemo(() => {
     if (!search.trim()) return webhooks;
     return webhooks.filter(
@@ -65,25 +65,23 @@ export default function DashboardPage() {
   }, [webhooks, search]);
 
   const handleWsMessage = useCallback((msg: WebSocketMessage) => {
-    if (msg.type !== 'WEBHOOK_STATUS') return;
-
-    setToasts((prev) => {
-      const exists = prev.find((t) => t.id === msg.webhookId);
-      if (exists) {
-        return prev.map((t) =>
-          t.id === msg.webhookId
-            ? { ...t, status: msg.status, message: msg.message }
-            : t
-        );
-      }
-      return [...prev, { id: msg.webhookId, status: msg.status, message: msg.message }];
+  if (msg.type === 'WEBHOOK_STATUS') {
+    addOrUpdateToast({
+      id: msg.webhookId,
+      status: msg.status,
+      message: msg.message,
     });
-
     if (msg.status === 'success' || msg.status === 'failure') {
       setTriggeringId(null);
       fetchWebhooks();
     }
-  }, [fetchWebhooks]);
+  }
+
+  // ✅ Show notice when event tree updates in real-time
+  if (msg.type === 'EVENT_TREE_UPDATE') {
+    setTreeUpdateNotice(`Event tree updated at ${new Date(msg.updatedAt).toLocaleTimeString()}`);
+    setTimeout(() => setTreeUpdateNotice(null), 4000);
+  }}, [fetchWebhooks]);
 
   useWebSocket(handleWsMessage);
 
@@ -96,9 +94,14 @@ export default function DashboardPage() {
     }
   };
 
-  const removeToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+  const handleOpenModal = () => {
+    // ✅ imperative handle — reset form before opening
+    modalRef.current?.reset();
+    setShowModal(true);
   };
+
+  const [treeUpdateNotice, setTreeUpdateNotice] = useState<string | null>(null);
+
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -126,8 +129,7 @@ export default function DashboardPage() {
       </nav>
 
       <main className="max-w-5xl mx-auto px-4 py-8">
-
-        {/* ✅ Stats — computed with useMemo */}
+        {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           {[
             { label: 'Total', value: stats.total, color: 'text-white' },
@@ -142,7 +144,7 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Page header + search */}
+        {/* Header + search */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-white">Webhooks</h1>
@@ -150,9 +152,7 @@ export default function DashboardPage() {
               {filteredWebhooks.length} of {webhooks.length} webhook{webhooks.length !== 1 ? 's' : ''}
             </p>
           </div>
-
           <div className="flex gap-3">
-            {/* ✅ useRef — this input is focused on mount */}
             <input
               ref={searchRef}
               type="text"
@@ -162,7 +162,7 @@ export default function DashboardPage() {
               className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 text-sm focus:outline-none focus:border-indigo-500 transition w-48"
             />
             <button
-              onClick={() => setShowModal(true)}
+              onClick={handleOpenModal}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition text-sm"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -172,6 +172,13 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+
+        {treeUpdateNotice && (
+          <div className="mb-4 px-4 py-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+            <p className="text-indigo-400 text-sm">{treeUpdateNotice}</p>
+          </div>
+        )}
 
         {/* Webhook list */}
         {loading ? (
@@ -210,8 +217,10 @@ export default function DashboardPage() {
         )}
       </main>
 
+      {/* ✅ ref passed to modal for imperative handle */}
       {showModal && (
         <AddWebhookModal
+          ref={modalRef}
           onClose={() => setShowModal(false)}
           onAdded={fetchWebhooks}
         />
