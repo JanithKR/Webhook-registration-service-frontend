@@ -41,4 +41,12 @@ export type WebSocketMessage =
       tree: Record<string, any>;
       updatedBy: string;
       updatedAt: string;
+    }
+  | {
+      type: 'DESTINATION_UPDATE';
+      destinations: import('./destinations').Destination[];
+      updatedBy: string;
+      updatedAt: string;
     };
+
+    

@@ -1,0 +1,12 @@
+{
+  "destinations": [
+    {
+      "type": "webhook_endpoint",
+      "label": "Webhook endpoint",
+      "description": "Send events to a hosted endpoint.",
+      "icon": "🔗",
+      "isDefault": true,
+      "removable": false
+    }
+  ]
+}
