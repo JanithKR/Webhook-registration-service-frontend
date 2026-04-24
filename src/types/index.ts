@@ -29,9 +29,16 @@ export interface Webhook {
   createdAt: string;
 }
 
-export type WebSocketMessage = {
-  type: 'WEBHOOK_STATUS';
-  webhookId: string;
-  status: 'sending' | 'success' | 'failure';
-  message: string;
-};
+export type WebSocketMessage =
+  | {
+      type: 'WEBHOOK_STATUS';
+      webhookId: string;
+      status: 'sending' | 'success' | 'failure';
+      message: string;
+    }
+  | {
+      type: 'EVENT_TREE_UPDATE';
+      tree: Record<string, any>;
+      updatedBy: string;
+      updatedAt: string;
+    };

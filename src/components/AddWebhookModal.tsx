@@ -6,6 +6,8 @@ import { collectLeaves, insertNode } from '../types/events';
 import EventTreeNode from './EventTreeNode';
 import AddRootEvent from './AddRootEvent';
 import eventConfig from '../config/events.json';
+import { useEventTree } from '../hooks/useEventTree';
+
 
 interface Props {
   onClose: () => void;
@@ -45,11 +47,7 @@ const DESTINATION_TYPES: {
 const AddWebhookModal = forwardRef<AddWebhookModalHandle, Props>(
   ({ onClose, onAdded }, ref) => {
     const [step, setStep] = useState(1);
-
-    // ✅ Live event tree state — starts from JSON, user extends it
-    const [eventTree, setEventTree] = useState<EventTree>(
-    eventConfig as unknown as EventTree
-    );
+    const {eventTree,setEventTree,publishTree,} = useEventTree();
     const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
     const [destinationType, setDestinationType] = useState<DestinationType>('webhook_endpoint');
     const [payloadStyle, setPayloadStyle] = useState<PayloadStyle>('snapshot');
@@ -83,21 +81,26 @@ const AddWebhookModal = forwardRef<AddWebhookModalHandle, Props>(
       }
     };
 
-    // ✅ Add child event — recursively inserts into live tree
-    const handleAddChild = (
-      parentPath: string[],
-      newKey: string,
-      newLabel: string
-    ) => {
-      setEventTree((prev) => insertNode(prev, parentPath, newKey, newLabel));
+    const handleAddChild = (parentPath: string[],newKey: string,newLabel: 
+      string) => {
+      setEventTree((prev) => {
+    const updated = insertNode(prev, parentPath, newKey, newLabel);
+    // ✅ Publish to all clients via Redis Pub/Sub
+    publishTree(updated);
+    return updated;
+      });
     };
 
-    // ✅ Add root level event group — no limit
     const handleAddRootEvent = (key: string, label: string) => {
-      setEventTree((prev) => ({
-        ...prev,
-        [key]: { label, children: {} },
-      }));
+    setEventTree((prev) => {
+    const updated = {
+      ...prev,
+      [key]: { label, children: {} },
+    };
+    // ✅ Publish to all clients via Redis Pub/Sub
+       publishTree(updated);
+       return updated;
+      });
     };
 
     const handleSubmit = async () => {

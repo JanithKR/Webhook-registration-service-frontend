@@ -65,13 +65,23 @@ export default function DashboardPage() {
   }, [webhooks, search]);
 
   const handleWsMessage = useCallback((msg: WebSocketMessage) => {
-    if (msg.type !== 'WEBHOOK_STATUS') return;
-    addOrUpdateToast({ id: msg.webhookId, status: msg.status, message: msg.message });
+  if (msg.type === 'WEBHOOK_STATUS') {
+    addOrUpdateToast({
+      id: msg.webhookId,
+      status: msg.status,
+      message: msg.message,
+    });
     if (msg.status === 'success' || msg.status === 'failure') {
       setTriggeringId(null);
       fetchWebhooks();
     }
-  }, [fetchWebhooks]);
+  }
+
+  // ✅ Show notice when event tree updates in real-time
+  if (msg.type === 'EVENT_TREE_UPDATE') {
+    setTreeUpdateNotice(`Event tree updated at ${new Date(msg.updatedAt).toLocaleTimeString()}`);
+    setTimeout(() => setTreeUpdateNotice(null), 4000);
+  }}, [fetchWebhooks]);
 
   useWebSocket(handleWsMessage);
 
@@ -89,6 +99,9 @@ export default function DashboardPage() {
     modalRef.current?.reset();
     setShowModal(true);
   };
+
+  const [treeUpdateNotice, setTreeUpdateNotice] = useState<string | null>(null);
+
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -159,6 +172,13 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+
+        {treeUpdateNotice && (
+          <div className="mb-4 px-4 py-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+            <p className="text-indigo-400 text-sm">{treeUpdateNotice}</p>
+          </div>
+        )}
 
         {/* Webhook list */}
         {loading ? (
